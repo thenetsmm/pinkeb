@@ -28,6 +28,12 @@ Render ပေါ်မှာ deploy လုပ်မယ့် Telegram Mini App b
 - Referral: ဖိတ်ခံရသူ ad 5 ပုဒ်ကြည့်ရင် inviter +50 (bonus balance)၊ နောက်ပိုင်း ad တိုင်း 10% commission → Profile မှာ **Claim Bonus** နှိပ်မှ balance ထဲဝင်။
 - Withdraw: min 500 Ks (1 pt = 1 Ks)၊ pending တစ်ခုပဲ။ Admin (ADMIN_IDS) ဆီ Telegram message + ✅/❌ button ပို့ပါတယ်၊ reject ရင် points ပြန်ထည့်။
 
+## Games (Lucky Spin / Scratch Card / Mystery Box)
+- ရလဒ်ကို server က ထုတ်ပါတယ် (client က animation သာ ပြ)။ Spin/Scratch = ad 1 ခုကြည့် → 1 ကြိမ်, တစ်ရက် 3 ကြိမ်, 10 မိနစ် cooldown (server timestamp)။
+- Free spin ကုန်ရင် "Spin Again" 15 pts။ Mystery Box = 15 pts (ad မလို)။
+- Daily Leaderboard (Top 10) = ယနေ့ ရတဲ့ net points (Myanmar time)။
+- Prize table တွေကို `src/services/games.js` မှာ ပြင်နိုင်ပါတယ်။
+
 ## Admin API (`x-admin-key: ADMIN_API_KEY`)
 `GET /api/admin/stats` · `GET /api/admin/withdrawals?status=pending` · `POST /api/admin/withdrawals/:id/approve|reject` · `GET|POST /api/admin/offers` · `POST /api/admin/users/:telegramId/ban`
 
