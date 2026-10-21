@@ -2,6 +2,7 @@ import { config } from '../config.js';
 import { dayKey, yesterdayKey } from '../lib/days.js';
 import { referralLink } from '../lib/telegram.js';
 import { User, Offer, AdSession, Withdrawal } from '../models/index.js';
+import { gamesState } from './games.js';
 
 export function streakInfo(user) {
   const today = dayKey();
@@ -79,6 +80,7 @@ export async function buildState(user, today) {
         ready: refs.active > 0 && !user.inviteTaskClaimed,
       },
     },
+    games: gamesState(user),
     mainAd: { reward: config.mainAdReward, seconds: config.mainAdSeconds, remainingToday: capLeft },
     offers: offers.map((o) => {
       const done = doneByOffer.get(String(o._id)) || 0;
@@ -112,6 +114,7 @@ export async function buildState(user, today) {
       demoAds: config.allowDemoAds,
       supportUsername: config.supportUsername,
       botUsername: config.botUsername,
+      appName: config.appName,
     },
   };
 }
