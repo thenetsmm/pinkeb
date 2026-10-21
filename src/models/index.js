@@ -33,6 +33,14 @@ const userSchema = new Schema(
       adsCount: { type: Number, default: 0 },
       checkin: { type: Boolean, default: false },
       ads5: { type: Boolean, default: false },
+      spins: { type: Number, default: 0 },
+      scratches: { type: Number, default: 0 },
+    },
+
+    // game cooldowns (server time)
+    games: {
+      spinNextAt: { type: Date, default: null },
+      scratchNextAt: { type: Date, default: null },
     },
 
     lastAdAt: Date,
@@ -45,7 +53,8 @@ const userSchema = new Schema(
 const adSessionSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    kind: { type: String, enum: ['main', 'offer'], required: true },
+    kind: { type: String, enum: ['main', 'offer', 'game'], required: true },
+    game: { type: String, default: '' },
     offerId: { type: Schema.Types.ObjectId, ref: 'Offer', default: null },
     reward: { type: Number, required: true },
     minSeconds: { type: Number, required: true },
@@ -72,6 +81,7 @@ const transactionSchema = new Schema(
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
+transactionSchema.index({ createdAt: -1 });
 
 /* ------------------------------- Withdrawal -------------------------------- */
 const withdrawalSchema = new Schema(
