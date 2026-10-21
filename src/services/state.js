@@ -3,6 +3,7 @@ import { dayKey, yesterdayKey } from '../lib/days.js';
 import { referralLink } from '../lib/telegram.js';
 import { User, Offer, AdSession, Withdrawal } from '../models/index.js';
 import { gamesState } from './games.js';
+import { piggyState } from './piggy.js';
 
 export function streakInfo(user) {
   const today = dayKey();
@@ -36,7 +37,7 @@ export async function referralCounts(user) {
 
 /** Full snapshot used by GET /api/me */
 export async function buildState(user, today) {
-  const [offers, offerCounts, refs, pendingWithdrawal] = await Promise.all([
+  const [offers, offerCounts, refs, pendingWithdrawal, piggy] = await Promise.all([
     Offer.find({ active: true }).sort({ sort: 1, createdAt: 1 }).lean(),
     AdSession.aggregate([
       { $match: { userId: user._id, status: 'completed', day: today, offerId: { $ne: null } } },
@@ -44,11 +45,13 @@ export async function buildState(user, today) {
     ]),
     referralCounts(user),
     Withdrawal.exists({ userId: user._id, status: 'pending' }),
+    piggyState(user),
   ]);
 
   const doneByOffer = new Map(offerCounts.map((o) => [String(o._id), o.n]));
   const streak = streakInfo(user);
   const adsToday = user.daily?.adsCount || 0;
+  const taskAds = user.daily?.taskAds || 0;
   const capLeft = Math.max(0, config.dailyAdCap - adsToday);
 
   return {
@@ -67,12 +70,12 @@ export async function buildState(user, today) {
     daily: {
       checkin: { claimed: !!user.daily?.checkin, reward: streak.nextReward },
       ads: {
-        count: Math.min(adsToday, config.adsTaskTarget),
+        count: Math.min(taskAds, config.adsTaskTarget),
         watchedToday: adsToday,
         target: config.adsTaskTarget,
         reward: config.adsTaskReward,
         claimed: !!user.daily?.ads5,
-        ready: adsToday >= config.adsTaskTarget && !user.daily?.ads5,
+        ready: taskAds >= config.adsTaskTarget && !user.daily?.ads5,
       },
       invite: {
         reward: config.inviteTaskReward,
@@ -81,6 +84,11 @@ export async function buildState(user, today) {
       },
     },
     games: gamesState(user),
+    piggy,
+    promo: { reward: null },
+    channel: config.channelUsername
+      ? { username: config.channelUsername, link: `https://t.me/${config.channelUsername}`, reward: config.channelReward, claimed: !!user.channelClaimed }
+      : null,
     mainAd: { reward: config.mainAdReward, seconds: config.mainAdSeconds, remainingToday: capLeft },
     offers: offers.map((o) => {
       const done = doneByOffer.get(String(o._id)) || 0;

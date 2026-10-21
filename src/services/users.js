@@ -1,6 +1,6 @@
 import { User } from '../models/index.js';
 
-const REF_RE = /^invite(\d{1,15})$/;
+const REF_RE = /^(?:invite)?_?(\d{5,15})$/i;
 
 export function parseReferral(param) {
   const m = REF_RE.exec(param || '');

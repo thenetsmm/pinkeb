@@ -35,7 +35,7 @@ export async function applyReferralRewards(user, reward) {
       sendMessage(
         referrer.telegramId,
         `🎉 Your friend <b>${escapeHtml(user.firstName || 'a friend')}</b> watched ${config.referralActivationAds} ads! ` +
-          `<b>+${config.referralBonus} pts</b> bonus is waiting - open PinkEarn and tap <b>Claim Bonus</b>.`
+          `<b>+${config.referralBonus} pts</b> bonus is waiting - open the app and tap <b>Claim Bonus</b>.`
       );
     }
   }

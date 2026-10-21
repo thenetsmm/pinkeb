@@ -26,11 +26,11 @@ export async function notifyAdminsNewWithdrawal(w, user) {
  * Approves / rejects a pending withdrawal (atomic, can only be resolved once).
  * Rejecting refunds the points.
  */
-export async function resolveWithdrawal(id, action) {
+export async function resolveWithdrawal(id, action, reason = '') {
   const status = action === 'approve' ? 'success' : 'rejected';
   const w = await Withdrawal.findOneAndUpdate(
     { _id: id, status: 'pending' },
-    { $set: { status, resolvedAt: new Date() } },
+    { $set: { status, resolvedAt: new Date(), reason: status === 'rejected' ? String(reason || '').slice(0, 200) : '' } },
     { new: true }
   );
   if (!w) return null;
@@ -44,7 +44,7 @@ export async function resolveWithdrawal(id, action) {
     w.telegramId,
     status === 'success'
       ? `✅ Your withdrawal of <b>${w.amountKs} Ks</b> via ${escapeHtml(w.method)} has been sent. Thank you!`
-      : `❌ Your withdrawal of <b>${w.amountKs} Ks</b> was rejected and <b>${w.points} pts</b> were returned to your balance. Contact support if you need help.`
+      : `❌ Your withdrawal of <b>${w.amountKs} Ks</b> was rejected and <b>${w.points} pts</b> were returned to your balance. ${w.reason ? `\nReason: ${escapeHtml(w.reason)}\n` : ''}Contact support if you need help.`
   );
   return w;
 }
