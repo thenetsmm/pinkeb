@@ -37,13 +37,24 @@ export const config = {
   minWithdraw: num(process.env.MIN_WITHDRAW_KS, 500),
   withdrawMethods: list(process.env.WITHDRAW_METHODS || 'KBZ Pay,Wave Pay'),
 
-  mainAdReward: num(process.env.MAIN_AD_REWARD, 50),
+  appName: process.env.APP_NAME || 'ShadowEarn',
+
+  // Ad earns ~45 Ks, so users get 15 pts per ad and the rest is margin for bonuses
+  mainAdReward: num(process.env.MAIN_AD_REWARD, 15),
   mainAdSeconds: num(process.env.MAIN_AD_SECONDS, 30),
   dailyAdCap: num(process.env.DAILY_AD_CAP, 40),
   adsTaskTarget: num(process.env.ADS_TASK_TARGET, 5),
-  adsTaskReward: num(process.env.ADS_TASK_REWARD, 100),
-  inviteTaskReward: num(process.env.INVITE_TASK_REWARD, 200),
-  streakRewards: list(process.env.STREAK_REWARDS || '10,15,20,25,30,40,60').map(Number).filter((n) => n > 0),
+  adsTaskReward: num(process.env.ADS_TASK_REWARD, 25),
+  inviteTaskReward: num(process.env.INVITE_TASK_REWARD, 50),
+  streakRewards: list(process.env.STREAK_REWARDS || '5,5,10,10,15,15,20').map(Number).filter((n) => n > 0),
+
+  // Games
+  gameAdSeconds: num(process.env.GAME_AD_SECONDS, 10), // minimum time an ad session must last before a game can be played
+  gameCooldownMinutes: num(process.env.GAME_COOLDOWN_MINUTES, 10),
+  spinDailyLimit: num(process.env.SPIN_DAILY_LIMIT, 3),
+  scratchDailyLimit: num(process.env.SCRATCH_DAILY_LIMIT, 3),
+  spinPaidCost: num(process.env.SPIN_PAID_COST, 15), // "Spin Again" after the free spins are used
+  mysteryCost: num(process.env.MYSTERY_COST, 15),
 
   referralActivationAds: num(process.env.REFERRAL_ACTIVATION_ADS, 5),
   referralBonus: num(process.env.REFERRAL_BONUS, 50),

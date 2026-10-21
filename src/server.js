@@ -25,7 +25,7 @@ app.use(
 );
 app.use(express.json({ limit: '20kb' }));
 
-app.get('/', (req, res) => res.json({ name: 'PinkEarn API', ok: true }));
+app.get('/', (req, res) => res.json({ name: `${config.appName} API`, ok: true }));
 app.get('/health', (req, res) => res.json({ ok: true, db: mongoose.connection.readyState === 1 }));
 
 app.use('/api/bot', botRoutes);
@@ -42,10 +42,14 @@ app.use((err, req, res, next) => {
 });
 
 async function seedOffers() {
-  if (await Offer.estimatedDocumentCount()) return;
+  if (await Offer.estimatedDocumentCount()) {
+    // one-off rebalance: the old default sponsored reward (20) -> 15
+    await Offer.updateOne({ key: 'sponsored', reward: 20 }, { $set: { reward: 15 } });
+    return;
+  }
   await Offer.insertMany([
     { key: 'short-video', title: 'Short video ad', reward: 10, seconds: 15, dailyLimit: 5, sort: 1 },
-    { key: 'sponsored', title: 'Sponsored ad', reward: 20, seconds: 20, dailyLimit: 3, sort: 2 },
+    { key: 'sponsored', title: 'Sponsored ad', reward: 15, seconds: 20, dailyLimit: 3, sort: 2 },
   ]);
   console.log('[seed] default offers created');
 }
