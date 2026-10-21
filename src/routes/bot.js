@@ -37,8 +37,8 @@ async function onMessage(msg) {
     const invited = user.invitedBy ? '\n\n🎁 You were invited by a friend - watch 5 ads to unlock their bonus!' : '';
     await sendMessage(
       msg.chat.id,
-      `👋 Welcome to <b>PinkEarn</b>, ${escapeHtml(msg.from.first_name || '')}!\n\nWatch ads, finish daily tasks and invite friends to earn points. Minimum payout is <b>${config.minWithdraw} Ks</b>.${invited}`,
-      url ? { reply_markup: { inline_keyboard: [[{ text: '🚀 Open PinkEarn', web_app: { url } }]] } } : {}
+      `👋 Welcome to <b>${escapeHtml(config.appName)}</b>, ${escapeHtml(msg.from.first_name || '')}!\n\nWatch ads, finish daily tasks and invite friends to earn points. Minimum payout is <b>${config.minWithdraw} Ks</b>.${invited}`,
+      url ? { reply_markup: { inline_keyboard: [[{ text: `🚀 Open ${config.appName}`, web_app: { url } }]] } } : {}
     );
     return;
   }
@@ -89,7 +89,7 @@ export async function setupBot() {
     console.warn('[bot] BACKEND_URL / RENDER_EXTERNAL_URL not set - webhook not registered');
   }
   const url = webAppUrl();
-  if (url) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: 'PinkEarn', web_app: { url } } });
+  if (url) await tg('setChatMenuButton', { menu_button: { type: 'web_app', text: config.appName, web_app: { url } } });
 }
 
 export default router;

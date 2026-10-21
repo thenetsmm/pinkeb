@@ -7,6 +7,8 @@ import { buildState, streakInfo } from '../services/state.js';
 import { applyReferralRewards } from '../services/referrals.js';
 import { notifyAdminsNewWithdrawal } from '../services/withdrawals.js';
 
+import gamesRoutes from './games.js';
+
 const router = Router();
 
 /* ------------------------- public: AdsGram reward callback ------------------------- */
@@ -29,6 +31,8 @@ router.get('/ads/adsgram-reward', async (req, res) => {
 router.use(auth);
 
 const credit = (userId, type, amount, note) => Transaction.create({ userId, type, amount, note });
+
+router.use('/games', gamesRoutes);
 
 /* ----------------------------------- state ----------------------------------- */
 router.get('/me', async (req, res) => {
