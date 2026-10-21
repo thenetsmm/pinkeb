@@ -35,7 +35,11 @@ const userSchema = new Schema(
       ads5: { type: Boolean, default: false },
       spins: { type: Number, default: 0 },
       scratches: { type: Number, default: 0 },
+      taskAds: { type: Number, default: 0 }, // ads watched from the Daily Task card only
     },
+
+    piggy: { startedAt: { type: Date, default: null } },
+    channelClaimed: { type: Boolean, default: false },
 
     // game cooldowns (server time)
     games: {
@@ -55,6 +59,8 @@ const adSessionSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     kind: { type: String, enum: ['main', 'offer', 'game'], required: true },
     game: { type: String, default: '' },
+    task: { type: String, default: '' }, // 'ads5' when watched from the Daily Task card
+    meta: { type: String, default: '' }, // promo code for promo sessions
     offerId: { type: Schema.Types.ObjectId, ref: 'Offer', default: null },
     reward: { type: Number, required: true },
     minSeconds: { type: Number, required: true },
@@ -94,6 +100,7 @@ const withdrawalSchema = new Schema(
     account: { type: String, required: true },
     accountName: { type: String, required: true },
     status: { type: String, enum: ['pending', 'success', 'rejected'], default: 'pending', index: true },
+    reason: { type: String, default: '' }, // shown to the user when rejected
     resolvedAt: Date,
   },
   { timestamps: true }
@@ -114,8 +121,31 @@ const offerSchema = new Schema(
   { timestamps: true }
 );
 
+/* -------------------------------- Promo codes -------------------------------- */
+const promoSchema = new Schema(
+  {
+    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
+    reward: { type: Number, required: true },
+    maxUses: { type: Number, default: 0 }, // 0 = unlimited
+    uses: { type: Number, default: 0 },
+    expiresAt: { type: Date, default: null },
+    active: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+const promoRedemptionSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    promoId: { type: Schema.Types.ObjectId, ref: 'PromoCode', required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+promoRedemptionSchema.index({ userId: 1, promoId: 1 }, { unique: true });
+
 export const User = mongoose.model('User', userSchema);
 export const AdSession = mongoose.model('AdSession', adSessionSchema);
 export const Transaction = mongoose.model('Transaction', transactionSchema);
 export const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 export const Offer = mongoose.model('Offer', offerSchema);
+export const PromoCode = mongoose.model('PromoCode', promoSchema);
+export const PromoRedemption = mongoose.model('PromoRedemption', promoRedemptionSchema);
