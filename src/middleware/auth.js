@@ -39,7 +39,7 @@ export async function auth(req, res, next) {
   if (user.daily?.date !== today) {
     const rolled = await User.findOneAndUpdate(
       { _id: user._id, 'daily.date': { $ne: today } },
-      { $set: { daily: { date: today, adsCount: 0, checkin: false, ads5: false } } },
+      { $set: { daily: { date: today, adsCount: 0, checkin: false, ads5: false, spins: 0, scratches: 0 } } },
       { new: true }
     );
     user = rolled || (await User.findById(user._id));
