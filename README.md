@@ -34,6 +34,13 @@ Render ပေါ်မှာ deploy လုပ်မယ့် Telegram Mini App b
 - Daily Leaderboard (Top 10) = ယနေ့ ရတဲ့ net points (Myanmar time)။
 - Prize table တွေကို `src/services/games.js` မှာ ပြင်နိုင်ပါတယ်။
 
+## Promo codes / Piggy Bank / Channel
+- Promo code ဖန်တီးရန် (admin ဖြစ်ရမယ်၊ ADMIN_IDS): bot ထဲမှာ `/promo SHADOW20 20 100 24` = code, +20 pts, လူ ၁၀၀, ၂၄ နာရီ။
+- Withdraw ပယ်ချရင် အကြောင်းပြချက်နဲ့: `/reject <withdrawalId> KPay နံပါတ် မှားနေပါတယ်`
+- Piggy Bank timer ကို server မှာ သိမ်းတယ် (၁၀ မိနစ်၊ +2 / ကြော်ငြာနဲ့ +15)။
+- Channel bonus: `CHANNEL_USERNAME` ထည့်ပြီး bot ကို channel admin လုပ်ထားရင် join မှန်/မမှန် စစ်ပါတယ်။
+- Watch-5 Daily Task က Daily Task card ကနေ ကြည့်တဲ့ ကြော်ငြာကိုပဲ ရေတွက်ပါတယ် (ပင်မ Watch Ads နဲ့ သီးသန့်)။
+
 ## Admin API (`x-admin-key: ADMIN_API_KEY`)
 `GET /api/admin/stats` · `GET /api/admin/withdrawals?status=pending` · `POST /api/admin/withdrawals/:id/approve|reject` · `GET|POST /api/admin/offers` · `POST /api/admin/users/:telegramId/ban`
 
