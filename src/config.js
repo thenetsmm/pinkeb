@@ -56,6 +56,13 @@ export const config = {
   spinPaidCost: num(process.env.SPIN_PAID_COST, 15), // "Spin Again" after the free spins are used
   mysteryCost: num(process.env.MYSTERY_COST, 15),
 
+  // Home extras
+  piggyCycleSeconds: num(process.env.PIGGY_CYCLE_SECONDS, 600), // 10 minutes
+  piggyBase: num(process.env.PIGGY_BASE_REWARD, 2), // claim without an ad
+  piggyBoosted: num(process.env.PIGGY_BOOST_REWARD, 15), // claim after watching an ad
+  channelUsername: (process.env.CHANNEL_USERNAME || '').replace('@', ''), // e.g. ShadowEarnOfficial (leave empty to hide the banner)
+  channelReward: num(process.env.CHANNEL_REWARD, 10),
+
   referralActivationAds: num(process.env.REFERRAL_ACTIVATION_ADS, 5),
   referralBonus: num(process.env.REFERRAL_BONUS, 50),
   commissionRate: num(process.env.COMMISSION_RATE, 0.1),
