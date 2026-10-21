@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
 import { adminOnly, ApiError } from '../middleware/auth.js';
-import { User, Offer, Withdrawal } from '../models/index.js';
+import { User, Offer, Withdrawal, PromoCode } from '../models/index.js';
 import { resolveWithdrawal } from '../services/withdrawals.js';
 
 const router = Router();
@@ -25,7 +25,7 @@ router.get('/withdrawals', async (req, res) => {
 router.post('/withdrawals/:id/:action', async (req, res) => {
   const { id, action } = req.params;
   if (!mongoose.isValidObjectId(id) || !['approve', 'reject'].includes(action)) throw new ApiError(400, 'bad_request');
-  const w = await resolveWithdrawal(id, action);
+  const w = await resolveWithdrawal(id, action, req.body?.reason);
   if (!w) throw new ApiError(409, 'already_resolved', 'Withdrawal not found or already resolved');
   res.json({ ok: true, status: w.status });
 });
@@ -42,6 +42,20 @@ router.post('/offers', async (req, res) => {
     { upsert: true, new: true }
   );
   res.json(offer);
+});
+
+/* promo codes: POST {code, reward, maxUses?, hours?} */
+router.get('/promos', async (req, res) => res.json(await PromoCode.find().sort({ createdAt: -1 }).limit(100).lean()));
+router.post('/promos', async (req, res) => {
+  const { code, reward, maxUses, hours, active } = req.body || {};
+  const c = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+  if (!c || !(Number(reward) > 0)) throw new ApiError(400, 'bad_request', 'code and reward are required');
+  const promo = await PromoCode.findOneAndUpdate(
+    { code: c },
+    { $set: { reward: Number(reward), maxUses: Number(maxUses) || 0, expiresAt: Number(hours) > 0 ? new Date(Date.now() + Number(hours) * 3600_000) : null, active: active !== false } },
+    { upsert: true, new: true }
+  );
+  res.json(promo);
 });
 
 router.post('/users/:telegramId/ban', async (req, res) => {

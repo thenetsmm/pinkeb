@@ -8,6 +8,7 @@ import { applyReferralRewards } from '../services/referrals.js';
 import { notifyAdminsNewWithdrawal } from '../services/withdrawals.js';
 
 import gamesRoutes from './games.js';
+import extrasRoutes from './extras.js';
 
 const router = Router();
 
@@ -33,6 +34,7 @@ router.use(auth);
 const credit = (userId, type, amount, note) => Transaction.create({ userId, type, amount, note });
 
 router.use('/games', gamesRoutes);
+router.use(extrasRoutes);
 
 /* ----------------------------------- state ----------------------------------- */
 router.get('/me', async (req, res) => {
@@ -66,6 +68,7 @@ router.post('/checkin', async (req, res) => {
 router.post('/ads/start', async (req, res) => {
   const user = req.user;
   const { offerId } = req.body || {};
+  const task = req.body?.task === 'ads5' && !offerId ? 'ads5' : '';
 
   if ((user.daily?.adsCount || 0) >= config.dailyAdCap)
     throw new ApiError(429, 'daily_limit', 'Daily ad limit reached. Come back tomorrow!');
@@ -95,6 +98,7 @@ router.post('/ads/start', async (req, res) => {
   const session = await AdSession.create({
     userId: user._id,
     kind,
+    task,
     offerId: offer?._id || null,
     reward,
     minSeconds,
@@ -131,7 +135,14 @@ router.post('/ads/complete', async (req, res) => {
   const updated = await User.findOneAndUpdate(
     { _id: user._id, 'daily.date': req.today, 'daily.adsCount': { $lt: config.dailyAdCap } },
     {
-      $inc: { balance: s.reward, totalEarned: s.reward, adsWatched: 1, 'daily.adsCount': 1 },
+      $inc: {
+        balance: s.reward,
+        totalEarned: s.reward,
+        adsWatched: 1,
+        'daily.adsCount': 1,
+        // only ads watched from the Daily Task card count towards "Watch 5 ads"
+        ...(s.task === 'ads5' ? { 'daily.taskAds': 1 } : {}),
+      },
       $set: { lastAdAt: new Date() },
     },
     { new: true }
@@ -141,14 +152,14 @@ router.post('/ads/complete', async (req, res) => {
   await credit(user._id, s.kind === 'offer' ? 'offer' : 'ad', s.reward, s.kind === 'offer' ? 'Offer reward' : 'Watched an ad');
   await applyReferralRewards(updated, s.reward);
 
-  res.json({ ok: true, reward: s.reward, balance: updated.balance, adsWatched: updated.adsWatched });
+  res.json({ ok: true, reward: s.reward, balance: updated.balance, adsWatched: updated.adsWatched, taskAds: updated.daily?.taskAds || 0 });
 });
 
 /* ---------------------------------- daily tasks ---------------------------------- */
 router.post('/tasks/ads/claim', async (req, res) => {
   const reward = config.adsTaskReward;
   const updated = await User.findOneAndUpdate(
-    { _id: req.user._id, 'daily.date': req.today, 'daily.ads5': false, 'daily.adsCount': { $gte: config.adsTaskTarget } },
+    { _id: req.user._id, 'daily.date': req.today, 'daily.ads5': false, 'daily.taskAds': { $gte: config.adsTaskTarget } },
     { $set: { 'daily.ads5': true }, $inc: { balance: reward, totalEarned: reward } },
     { new: true }
   );
@@ -264,7 +275,7 @@ router.get('/history', async (req, res) => {
     adsWatched: req.user.adsWatched,
     totalEarned: req.user.totalEarned,
     withdrawals: withdrawals.map((w) => ({
-      id: String(w._id), amountKs: w.amountKs, points: w.points, method: w.method, status: w.status, createdAt: w.createdAt,
+      id: String(w._id), amountKs: w.amountKs, points: w.points, method: w.method, status: w.status, reason: w.reason || '', createdAt: w.createdAt,
     })),
     transactions: transactions.map((t) => ({
       id: String(t._id), type: t.type, amount: t.amount, note: t.note, createdAt: t.createdAt,

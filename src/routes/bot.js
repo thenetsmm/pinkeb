@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { tg, sendMessage, escapeHtml, webAppUrl } from '../lib/telegram.js';
 import { ensureUser, parseReferral } from '../services/users.js';
 import { resolveWithdrawal } from '../services/withdrawals.js';
-import { Withdrawal } from '../models/index.js';
+import { Withdrawal, PromoCode } from '../models/index.js';
 
 const router = Router();
 
@@ -41,6 +41,29 @@ async function onMessage(msg) {
       url ? { reply_markup: { inline_keyboard: [[{ text: `🚀 Open ${config.appName}`, web_app: { url } }]] } } : {}
     );
     return;
+  }
+
+  // ---- admin shortcuts ----
+  // /promo CODE REWARD [MAX_USES] [HOURS]   e.g. /promo SHADOW20 20 100 24
+  // /reject WITHDRAWAL_ID reason...
+  if (config.adminIds.includes(msg.from.id) && (text.startsWith('/promo') || text.startsWith('/reject'))) {
+    const [cmd, ...a] = text.split(/\s+/);
+    if (cmd === '/promo') {
+      const code = String(a[0] || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+      const reward = Number(a[1]);
+      if (!code || !(reward > 0)) return sendMessage(msg.chat.id, 'Usage: /promo CODE REWARD [MAX_USES] [HOURS]');
+      const hours = Number(a[3]);
+      const p = await PromoCode.findOneAndUpdate(
+        { code },
+        { $set: { reward, maxUses: Number(a[2]) || 0, expiresAt: hours > 0 ? new Date(Date.now() + hours * 3600_000) : null, active: true, uses: 0 } },
+        { upsert: true, new: true }
+      );
+      return sendMessage(msg.chat.id, `✅ Promo <b>${escapeHtml(p.code)}</b>: +${p.reward} pts, ${p.maxUses || '∞'} uses${hours > 0 ? `, expires in ${hours}h` : ''}`);
+    }
+    const [id, ...why] = a;
+    if (!mongoose.isValidObjectId(id)) return sendMessage(msg.chat.id, 'Usage: /reject WITHDRAWAL_ID reason');
+    const w = await resolveWithdrawal(id, 'reject', why.join(' '));
+    return sendMessage(msg.chat.id, w ? '❌ Rejected and refunded.' : 'Not found or already handled.');
   }
 
   if (text === '/help' || text === '/support') {
