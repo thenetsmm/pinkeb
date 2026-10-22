@@ -2,7 +2,9 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { auth, ApiError } from '../middleware/auth.js';
-import { User, Offer, AdSession, Transaction, Withdrawal } from '../models/index.js';
+import { User, Offer, OfferClaim, AdSession, Transaction, Withdrawal } from '../models/index.js';
+import { bumpAd, logSecurity } from '../services/stats.js';
+import { tg } from '../lib/telegram.js';
 import { buildState, streakInfo } from '../services/state.js';
 import { applyReferralRewards } from '../services/referrals.js';
 import { notifyAdminsNewWithdrawal } from '../services/withdrawals.js';
@@ -14,7 +16,7 @@ const router = Router();
 
 /* ------------------------- public: AdsGram reward callback ------------------------- */
 // Set in AdsGram "Reward URL":  https://<backend>/api/ads/adsgram-reward?secret=<ADSGRAM_REWARD_SECRET>&userid=[userId]
-router.get('/ads/adsgram-reward', async (req, res) => {
+router.get(['/ads/adsgram-reward', '/ads/reward'], async (req, res) => {
   const { secret, userid } = req.query;
   if (!config.adsgramRewardSecret || secret !== config.adsgramRewardSecret) throw new ApiError(401, 'unauthorized');
   const user = await User.findOne({ telegramId: Number(userid) }).select('_id');
@@ -90,6 +92,7 @@ router.post('/ads/start', async (req, res) => {
     if (!mongoose.isValidObjectId(offerId)) throw new ApiError(400, 'invalid_offer');
     offer = await Offer.findOne({ _id: offerId, active: true });
     if (!offer) throw new ApiError(404, 'invalid_offer', 'Offer not found');
+    if (offer.type === 'channel') throw new ApiError(400, 'invalid_offer', 'Join the channel and tap Claim');
     const doneToday = await AdSession.countDocuments({
       userId: user._id, offerId: offer._id, status: 'completed', day: req.today,
     });
@@ -130,7 +133,10 @@ router.post('/ads/complete', async (req, res) => {
     await AdSession.updateOne({ _id: s._id }, { $set: { status: 'expired' } });
     throw new ApiError(400, 'expired', 'Ad session expired');
   }
-  if (elapsed < s.minSeconds - 1) throw new ApiError(429, 'too_early', 'Please watch the whole ad to earn points');
+  if (elapsed < s.minSeconds - 1) {
+    if (elapsed < 5) logSecurity('fast_ad', user, { seconds: Math.round(elapsed), needed: s.minSeconds, kind: s.kind });
+    throw new ApiError(429, 'too_early', 'Please watch the whole ad to earn points');
+  }
   if (s.needsConfirm && !s.providerConfirmed) throw new ApiError(409, 'awaiting_provider', 'Waiting for ad confirmation');
 
   // gate: the session can be paid exactly once
@@ -168,6 +174,7 @@ router.post('/ads/complete', async (req, res) => {
 
   if (s.reward > 0) await credit(user._id, s.kind === 'offer' ? 'offer' : 'ad', s.reward, s.kind === 'offer' ? 'Offer reward' : 'Watched an ad');
   await applyReferralRewards(updated, s.reward || config.mainAdReward);
+  bumpAd(s.kind === 'offer' ? 'offer' : s.task === 'ads5' ? 'task' : 'main');
 
   res.json({ ok: true, reward: s.reward, balance: updated.balance, adsWatched: updated.adsWatched, taskAds: updated.daily?.taskAds || 0 });
 });
@@ -197,6 +204,30 @@ router.post('/tasks/invite/claim', async (req, res) => {
   if (!updated) throw new ApiError(409, 'already_claimed', 'Already claimed');
   await credit(req.user._id, 'task_invite', reward, 'Invite a friend');
   res.json({ ok: true, reward, balance: updated.balance });
+});
+
+/* ------------------------- one-time channel / link offers ------------------------- */
+router.post('/offers/:id/claim', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(400, 'invalid_offer');
+  const offer = await Offer.findOne({ _id: req.params.id, active: true, type: { $in: ['channel', 'link'] } });
+  if (!offer) throw new ApiError(404, 'invalid_offer', 'Task not found');
+  if (await OfferClaim.exists({ userId: req.user._id, offerId: offer._id })) throw new ApiError(409, 'already_claimed', 'Already claimed');
+
+  if (offer.type === 'channel' && offer.channel) {
+    // verify when the bot can see the channel (make the bot a channel admin); otherwise trust the opened link
+    const r = await tg('getChatMember', { chat_id: `@${offer.channel.replace('@', '')}`, user_id: req.user.telegramId });
+    if (r?.ok && !['member', 'administrator', 'creator', 'restricted'].includes(r.result?.status))
+      throw new ApiError(409, 'not_joined', 'Join the channel first, then tap Claim');
+  }
+  try {
+    await OfferClaim.create({ userId: req.user._id, offerId: offer._id });
+  } catch (e) {
+    if (e.code === 11000) throw new ApiError(409, 'already_claimed', 'Already claimed');
+    throw e;
+  }
+  const updated = await User.findOneAndUpdate({ _id: req.user._id }, { $inc: { balance: offer.reward, totalEarned: offer.reward } }, { new: true });
+  await credit(req.user._id, 'offer', offer.reward, offer.title);
+  res.json({ ok: true, reward: offer.reward, balance: updated.balance });
 });
 
 /* ---------------------------------- referrals ---------------------------------- */
@@ -240,6 +271,7 @@ router.post('/referrals/claim', async (req, res) => {
 /* ----------------------------------- withdraw ----------------------------------- */
 router.post('/withdraw', async (req, res) => {
   const user = req.user;
+  if (config.pauseWithdrawals) throw new ApiError(503, 'withdraw_paused', 'Withdrawals are paused for a short while. Please try again later.');
   const { method, account, accountName } = req.body || {};
   const points = Math.floor(Number(req.body?.points));
 
@@ -278,6 +310,7 @@ router.post('/withdraw', async (req, res) => {
     throw err;
   }
   await credit(user._id, 'withdraw', -points, `Withdrawal via ${method}`);
+  if (user.adsWatched < 5) logSecurity('withdraw_risk', user, { points, ads: user.adsWatched });
   notifyAdminsNewWithdrawal(w, user).catch(() => {});
   res.json({ ok: true, balance: updated.balance, withdrawalId: String(w._id) });
 });
@@ -285,8 +318,8 @@ router.post('/withdraw', async (req, res) => {
 /* ----------------------------------- history ----------------------------------- */
 router.get('/history', async (req, res) => {
   const [withdrawals, transactions] = await Promise.all([
-    Withdrawal.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(30).lean(),
-    Transaction.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(40).lean(),
+    Withdrawal.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(5).lean(),
+    Transaction.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(10).lean(),
   ]);
   res.json({
     adsWatched: req.user.adsWatched,

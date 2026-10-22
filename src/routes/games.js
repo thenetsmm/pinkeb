@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { ApiError } from '../middleware/auth.js';
 import { AdSession } from '../models/index.js';
 import { applyReferralRewards } from '../services/referrals.js';
+import { bumpAd } from '../services/stats.js';
 import {
   GAMES, MYSTERY, rollMystery, gamesState, leaderboard, txn,
   assertCanPlayWithAd, consumeGameSession, applyAdPlay, applyPaidPlay, usedToday,
@@ -51,8 +52,7 @@ for (const game of Object.keys(GAMES)) {
       const prize = g.values[index];
       const updated = await applyPaidPlay(user, cost, prize);
       if (!updated) throw new ApiError(400, 'insufficient', `Not enough points. You need ${cost} pts.`);
-      await txn(user._id, 'game_cost', -cost, `${g.label} (paid spin)`);
-      if (prize > 0) await txn(user._id, g.txType, prize, `${g.label} prize`);
+      await txn(user._id, g.txType, prize - cost, `${g.label} (won ${prize}, cost ${cost})`);
       return res.json({ ok: true, paid: true, index, prize, cost, balance: updated.balance });
     }
 
@@ -66,6 +66,7 @@ for (const game of Object.keys(GAMES)) {
     if (prize > 0) await txn(user._id, g.txType, prize, `${g.label} prize`);
     // the ad impression counts like any other ad view (referral commission / activation)
     await applyReferralRewards(updated, config.mainAdReward);
+    bumpAd(game);
 
     const state = gamesState(updated)[game];
     res.json({ ok: true, paid: false, index, prize, balance: updated.balance, left: state.left, cooldownSec: state.cooldownSec });
@@ -79,8 +80,7 @@ router.post('/mystery/play', async (req, res) => {
   const prize = rollMystery();
   const updated = await applyPaidPlay(req.user, cost, prize);
   if (!updated) throw new ApiError(400, 'insufficient', `Not enough points. You need ${cost} pts.`);
-  await txn(req.user._id, 'game_cost', -cost, 'Mystery Box (cost)');
-  await txn(req.user._id, 'game_mystery', prize, 'Mystery Box prize');
+  await txn(req.user._id, 'game_mystery', prize - cost, `Mystery Box (won ${prize}, cost ${cost})`);
 
   // the two boxes the player did not pick: the other two values, shuffled
   const others = [...MYSTERY];

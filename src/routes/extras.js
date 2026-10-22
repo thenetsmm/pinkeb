@@ -6,6 +6,7 @@ import { applyReferralRewards } from '../services/referrals.js';
 import { consumeGameSession } from '../services/games.js';
 import { claimPiggy, isPiggyReady } from '../services/piggy.js';
 import { tg } from '../lib/telegram.js';
+import { bumpAd } from '../services/stats.js';
 
 // Mounted at /api, AFTER auth. Piggy bank, promo codes, channel bonus.
 const router = Router();
@@ -44,6 +45,7 @@ router.post('/piggy/claim-double', async (req, res) => {
   // the ad view counts like any other ad view
   const after = await User.findByIdAndUpdate(updated._id, { $inc: { adsWatched: 1, 'daily.adsCount': 1 } }, { new: true });
   await applyReferralRewards(after, config.mainAdReward);
+  bumpAd('piggy');
   res.json({ ok: true, reward: config.piggyBoosted, balance: updated.balance });
 });
 
@@ -78,7 +80,8 @@ router.post('/promo/check', async (req, res) => {
   guard(req.user);
   const code = normalize(req.body?.code);
   const promo = await checkPromo(req.user, code);
-  res.json({ ok: true, reward: promo.reward, ...(await openAdSession(req.user, 'promo', promo.code)) });
+  if (!promo.requireAd) return res.json({ ok: true, reward: promo.reward, requireAd: false });
+  res.json({ ok: true, requireAd: true, reward: promo.reward, ...(await openAdSession(req.user, 'promo', promo.code)) });
 });
 
 // 2) after the ad: pay once
@@ -86,8 +89,10 @@ router.post('/promo/redeem', async (req, res) => {
   guard(req.user);
   const code = normalize(req.body?.code);
   const promo = await checkPromo(req.user, code);
-  const session = await consumeGameSession(req.user, req.body?.sessionId, 'promo');
-  if (session.meta !== promo.code) throw new ApiError(400, 'invalid_session', 'This ad was for a different code');
+  if (promo.requireAd) {
+    const session = await consumeGameSession(req.user, req.body?.sessionId, 'promo');
+    if (session.meta !== promo.code) throw new ApiError(400, 'invalid_session', 'This ad was for a different code');
+  }
 
   // unique index = one redemption per user, even with parallel requests
   try {
@@ -116,11 +121,14 @@ router.post('/promo/redeem', async (req, res) => {
 
   const updated = await User.findByIdAndUpdate(
     req.user._id,
-    { $inc: { balance: promo.reward, totalEarned: promo.reward, adsWatched: 1, 'daily.adsCount': 1 } },
+    { $inc: { balance: promo.reward, totalEarned: promo.reward, ...(promo.requireAd ? { adsWatched: 1, 'daily.adsCount': 1 } : {}) } },
     { new: true }
   );
   await credit(req.user._id, 'promo', promo.reward, `Promo code ${promo.code}`);
-  await applyReferralRewards(updated, config.mainAdReward);
+  if (promo.requireAd) {
+    await applyReferralRewards(updated, config.mainAdReward);
+    bumpAd('promo');
+  }
   res.json({ ok: true, reward: promo.reward, balance: updated.balance });
 });
 
