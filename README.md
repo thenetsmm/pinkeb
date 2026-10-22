@@ -47,3 +47,10 @@ Render ပေါ်မှာ deploy လုပ်မယ့် Telegram Mini App b
 
 ## Local run
 `cp .env.example .env` → ဖြည့် → `npm install && npm run dev`  (Telegram မပါဘဲစမ်းချင်ရင် `DEV_AUTH=true` + header `x-dev-user: 111`)
+
+## Admin Panel (Mini App ထဲမှာ)
+- Render env: `ADMIN_IDS=7072739469` (သင့် Telegram ID) နဲ့ `ADMIN_PIN=<ဂဏန်း ၆လုံး>` ထည့်ပါ။ Redeploy လုပ်ပါ။
+- App > Profile ထဲမှာ admin ID နဲ့ဝင်ရင်သာ "⚙️ Admin Panel" ပေါ်ပါမယ်။ PIN ထည့်မှ ဖွင့်ပါမယ် (ကြိမ် ၅ ခါမှားရင် ၁၀ မိနစ်ပိတ်)။
+- `/api/admin/*` အားလုံးက Telegram identity (ADMIN_IDS) + `x-admin-pin` နှစ်ခုလုံးစစ်ပါတယ်။
+- Modules: Overview, Withdrawals (Approve / Reject & Refund / Reject & Ban), Users, Settings (MongoDB ထဲသိမ်း၊ redeploy မလို), Tasks, Promo + Broadcast, Anti-Fraud + Maintenance/Pause switches။
+- Reject & Ban က points ပြန်မထည့်ပါ။ Channel task verify အတွက် bot ကို channel admin လုပ်ထားရမယ်။
