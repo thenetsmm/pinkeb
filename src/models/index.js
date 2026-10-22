@@ -42,6 +42,8 @@ const userSchema = new Schema(
     piggy: { startedAt: { type: Date, default: null } },
     channelClaimed: { type: Boolean, default: false },
     mainAdNextAt: { type: Date, default: null },
+    lastIp: { type: String, default: '', index: true },
+    banReason: { type: String, default: '' },
 
     // game cooldowns (server time)
     games: {
@@ -90,6 +92,9 @@ const transactionSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 transactionSchema.index({ createdAt: -1 });
+// Optional storage saver: TX_TTL_DAYS=30 deletes old history rows automatically (all-time admin totals then cover only that window).
+const TX_TTL_DAYS = Number(process.env.TX_TTL_DAYS ?? 30); // 0 = keep forever
+if (TX_TTL_DAYS > 0) transactionSchema.index({ createdAt: 1 }, { expireAfterSeconds: TX_TTL_DAYS * 86400 });
 
 /* ------------------------------- Withdrawal -------------------------------- */
 const withdrawalSchema = new Schema(
@@ -117,6 +122,9 @@ const offerSchema = new Schema(
     seconds: { type: Number, default: 15 },
     url: { type: String, default: '' }, // if set: opened as a link, otherwise shown as a video ad
     dailyLimit: { type: Number, default: 3 },
+    type: { type: String, enum: ['ad', 'link', 'channel'], default: 'ad' }, // channel = Telegram channel (bot verifies), link = external website
+    channel: { type: String, default: '' }, // @username for channel tasks
+    icon: { type: String, default: 'play' },
     active: { type: Boolean, default: true },
     sort: { type: Number, default: 0 },
   },
@@ -131,6 +139,7 @@ const promoSchema = new Schema(
     maxUses: { type: Number, default: 0 }, // 0 = unlimited
     uses: { type: Number, default: 0 },
     expiresAt: { type: Date, default: null },
+    requireAd: { type: Boolean, default: true },
     active: { type: Boolean, default: true },
   },
   { timestamps: true }
@@ -147,7 +156,43 @@ promoRedemptionSchema.index({ userId: 1, promoId: 1 }, { unique: true });
 export const User = mongoose.model('User', userSchema);
 export const AdSession = mongoose.model('AdSession', adSessionSchema);
 export const Transaction = mongoose.model('Transaction', transactionSchema);
+// finished (paid / rejected) withdrawals are deleted after 30 days; pending ones have no resolvedAt so they stay
+withdrawalSchema.index({ resolvedAt: 1 }, { expireAfterSeconds: 2592000 });
 export const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
 export const Offer = mongoose.model('Offer', offerSchema);
+// expired promo codes are removed 7 days after they expire (codes without expiresAt stay)
+promoSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 604800 });
 export const PromoCode = mongoose.model('PromoCode', promoSchema);
 export const PromoRedemption = mongoose.model('PromoRedemption', promoRedemptionSchema);
+
+/* ---------------- admin: stats, security log, one-time offers, settings ---------------- */
+const dailyStatSchema = new Schema(
+  {
+    day: { type: String, required: true, unique: true },
+    ads: { type: Map, of: Number, default: {} }, // main, task, spin, scratch, piggy, promo, offer
+    adsTotal: { type: Number, default: 0 },
+    dau: { type: Number, default: 0 },
+  },
+  { versionKey: false }
+);
+const securityLogSchema = new Schema(
+  {
+    type: { type: String, required: true }, // fast_ad | withdraw_risk | admin
+    userId: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+    telegramId: Number,
+    detail: { type: Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+securityLogSchema.index({ createdAt: -1 });
+const offerClaimSchema = new Schema(
+  { userId: { type: Schema.Types.ObjectId, required: true }, offerId: { type: Schema.Types.ObjectId, required: true } },
+  { timestamps: { createdAt: true, updatedAt: false } }
+);
+offerClaimSchema.index({ userId: 1, offerId: 1 }, { unique: true });
+const settingSchema = new Schema({ key: { type: String, unique: true }, values: { type: Schema.Types.Mixed, default: {} } }, { timestamps: true });
+
+export const DailyStat = mongoose.model('DailyStat', dailyStatSchema);
+export const SecurityLog = mongoose.model('SecurityLog', securityLogSchema);
+export const OfferClaim = mongoose.model('OfferClaim', offerClaimSchema);
+export const Setting = mongoose.model('Setting', settingSchema);
