@@ -18,7 +18,7 @@ export const config = {
 
   // Telegram
   botToken,
-  botUsername: (process.env.BOT_USERNAME || 'PinkEarnBot').replace('@', ''),
+  botUsername: (process.env.BOT_USERNAME || 'shaddowearn_bot').replace('@', ''),
   supportUsername: (process.env.SUPPORT_USERNAME || 'PinkEarnSupport').replace('@', ''),
   // Secret used to verify that webhook calls really come from Telegram
   webhookSecret:
@@ -57,6 +57,19 @@ export const config = {
   scratchDailyLimit: num(process.env.SCRATCH_DAILY_LIMIT, 3),
   spinPaidCost: num(process.env.SPIN_PAID_COST, 15), // "Spin Again" after the free spins are used
   mysteryCost: num(process.env.MYSTERY_COST, 15),
+
+  // Admin
+  adminPin: process.env.ADMIN_PIN || '', // 6 digits - keep it in the Render env only
+  adRevenueKs: num(process.env.AD_REVENUE_KS, 45), // what one ad earns you, for the profit calculator
+
+  // Runtime-editable from the admin panel (saved in MongoDB, see services/settings.js)
+  gameOdds: { spin: [45, 25, 8, 2, 0, 20], scratch: [40, 30, 20, 10], mystery: [65, 30, 5] },
+  richadsZoneId: '',
+  adsterraLink: '',
+  partnerLinks: ['', '', '', '', ''],
+  redirectOnLimit: true,
+  maintenance: false,
+  pauseWithdrawals: false,
 
   // Home extras
   piggyCycleSeconds: num(process.env.PIGGY_CYCLE_SECONDS, 600), // 10 minutes

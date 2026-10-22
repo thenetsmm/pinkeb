@@ -9,6 +9,7 @@ import apiRoutes from './routes/api.js';
 import adminRoutes from './routes/admin.js';
 import botRoutes, { setupBot } from './routes/bot.js';
 import { Offer } from './models/index.js';
+import { loadSettings } from './services/settings.js';
 
 const app = express();
 app.set('trust proxy', 1); // Render sits behind a proxy
@@ -20,16 +21,16 @@ app.use(
       if (!origin || config.frontendUrls.length === 0 || config.frontendUrls.includes(origin)) return cb(null, true);
       cb(null, false);
     },
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key', 'x-dev-user', 'x-dev-start'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-key', 'x-admin-pin', 'x-dev-user', 'x-dev-start'],
   })
 );
-app.use(express.json({ limit: '20kb' }));
+app.use(express.json({ limit: '40kb' }));
 
 app.get('/', (req, res) => res.json({ name: `${config.appName} API`, ok: true }));
 app.get('/health', (req, res) => res.json({ ok: true, db: mongoose.connection.readyState === 1 }));
 
 app.use('/api/bot', botRoutes);
-app.use('/api/admin', rateLimit({ windowMs: 60_000, limit: 60 }), adminRoutes); // before /api (which requires Telegram auth)
+app.use('/api/admin', rateLimit({ windowMs: 60_000, limit: 120 }), adminRoutes); // before /api (which requires Telegram auth)
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 150, standardHeaders: true, legacyHeaders: false }), apiRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'not_found' }));
@@ -59,6 +60,8 @@ async function main() {
   await mongoose.connect(config.mongoUri);
   console.log('[db] connected');
   await seedOffers();
+  await loadSettings();
+  setInterval(() => loadSettings().catch(() => {}), 60_000); // pick up changes if several instances run
   app.listen(config.port, () => console.log(`[server] listening on :${config.port}`));
   setupBot().catch((e) => console.warn('[bot] setup error', e.message));
 }
