@@ -39,7 +39,8 @@ Render ပေါ်မှာ deploy လုပ်မယ့် Telegram Mini App b
 - Withdraw ပယ်ချရင် အကြောင်းပြချက်နဲ့: `/reject <withdrawalId> KPay နံပါတ် မှားနေပါတယ်`
 - Piggy Bank timer ကို server မှာ သိမ်းတယ် (၁၀ မိနစ်၊ +2 / ကြော်ငြာနဲ့ +15)။
 - Channel bonus: `CHANNEL_USERNAME` ထည့်ပြီး bot ကို channel admin လုပ်ထားရင် join မှန်/မမှန် စစ်ပါတယ်။
-- Watch-5 Daily Task က Daily Task card ကနေ ကြည့်တဲ့ ကြော်ငြာကိုပဲ ရေတွက်ပါတယ် (ပင်မ Watch Ads နဲ့ သီးသန့်)။
+- ပင်မ Watch Ads: တစ်ရက် ၅ ကြိမ် (MAIN_AD_DAILY_LIMIT)၊ ကြော်ငြာတစ်ခုနဲ့တစ်ခုကြား ၅ မိနစ် (MAIN_AD_COOLDOWN_MINUTES)။
+- Watch-5 Daily Task (ကြော်ငြာ ၅ ပုဒ်က pts 0၊ ၅/၅ ပြည့်မှ Claim +125) က Daily Task card ကနေ ကြည့်တဲ့ ကြော်ငြာကိုပဲ ရေတွက်ပါတယ် (ပင်မ Watch Ads နဲ့ သီးသန့်)။
 
 ## Admin API (`x-admin-key: ADMIN_API_KEY`)
 `GET /api/admin/stats` · `GET /api/admin/withdrawals?status=pending` · `POST /api/admin/withdrawals/:id/approve|reject` · `GET|POST /api/admin/offers` · `POST /api/admin/users/:telegramId/ban`
