@@ -73,7 +73,15 @@ router.post('/ads/start', async (req, res) => {
   if ((user.daily?.adsCount || 0) >= config.dailyAdCap)
     throw new ApiError(429, 'daily_limit', 'Daily ad limit reached. Come back tomorrow!');
 
-  let reward = config.mainAdReward;
+  const isMain = !offerId && !task;
+  if (isMain) {
+    if ((user.daily?.mainAds || 0) >= config.mainAdDailyLimit)
+      throw new ApiError(429, 'main_limit', 'No more ads today. Come back tomorrow!');
+    const wait = user.mainAdNextAt ? Math.ceil((user.mainAdNextAt.getTime() - Date.now()) / 1000) : 0;
+    if (wait > 0) throw new ApiError(429, 'cooldown', `Next ad in ${Math.floor(wait / 60)}:${String(wait % 60).padStart(2, '0')}`);
+  }
+
+  let reward = task ? 0 : config.mainAdReward; // Daily Task ads pay 0; the bonus comes with the final claim
   let minSeconds = config.mainAdSeconds;
   let kind = 'main';
   let offer = null;
@@ -132,8 +140,16 @@ router.post('/ads/complete', async (req, res) => {
   );
   if (!gate) throw new ApiError(400, 'invalid_session');
 
+  const isMain = s.kind === 'main' && s.task !== 'ads5';
+  const filter = { _id: user._id, 'daily.date': req.today, 'daily.adsCount': { $lt: config.dailyAdCap } };
+  if (isMain) {
+    filter.$and = [
+      { $or: [{ 'daily.mainAds': { $exists: false } }, { 'daily.mainAds': { $lt: config.mainAdDailyLimit } }] },
+      { $or: [{ mainAdNextAt: null }, { mainAdNextAt: { $lte: new Date() } }] },
+    ];
+  }
   const updated = await User.findOneAndUpdate(
-    { _id: user._id, 'daily.date': req.today, 'daily.adsCount': { $lt: config.dailyAdCap } },
+    filter,
     {
       $inc: {
         balance: s.reward,
@@ -142,15 +158,16 @@ router.post('/ads/complete', async (req, res) => {
         'daily.adsCount': 1,
         // only ads watched from the Daily Task card count towards "Watch 5 ads"
         ...(s.task === 'ads5' ? { 'daily.taskAds': 1 } : {}),
+        ...(isMain ? { 'daily.mainAds': 1 } : {}),
       },
-      $set: { lastAdAt: new Date() },
+      $set: { lastAdAt: new Date(), ...(isMain ? { mainAdNextAt: new Date(Date.now() + config.mainAdCooldownMinutes * 60_000) } : {}) },
     },
     { new: true }
   );
   if (!updated) throw new ApiError(429, 'daily_limit', 'Daily ad limit reached. Come back tomorrow!');
 
-  await credit(user._id, s.kind === 'offer' ? 'offer' : 'ad', s.reward, s.kind === 'offer' ? 'Offer reward' : 'Watched an ad');
-  await applyReferralRewards(updated, s.reward);
+  if (s.reward > 0) await credit(user._id, s.kind === 'offer' ? 'offer' : 'ad', s.reward, s.kind === 'offer' ? 'Offer reward' : 'Watched an ad');
+  await applyReferralRewards(updated, s.reward || config.mainAdReward);
 
   res.json({ ok: true, reward: s.reward, balance: updated.balance, adsWatched: updated.adsWatched, taskAds: updated.daily?.taskAds || 0 });
 });
