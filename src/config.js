@@ -77,6 +77,8 @@ export const config = {
   piggyBoosted: num(process.env.PIGGY_BOOST_REWARD, 15), // claim after watching an ad
   channelUsername: (process.env.CHANNEL_USERNAME || '').replace('@', ''), // e.g. ShadowEarnOfficial (leave empty to hide the banner)
   channelReward: num(process.env.CHANNEL_REWARD, 10),
+  // Public payout-proof channel (AdsGram moderation clause 8). The bot must be an admin of it. Falls back to CHANNEL_USERNAME.
+  proofChannel: (process.env.PROOF_CHANNEL || process.env.CHANNEL_USERNAME || '').replace('@', ''),
 
   referralActivationAds: num(process.env.REFERRAL_ACTIVATION_ADS, 5),
   referralBonus: num(process.env.REFERRAL_BONUS, 50),
