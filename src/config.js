@@ -44,7 +44,9 @@ export const config = {
   mainAdSeconds: num(process.env.MAIN_AD_SECONDS, 30),
   dailyAdCap: num(process.env.DAILY_AD_CAP, 40),
   adsTaskTarget: num(process.env.ADS_TASK_TARGET, 5),
-  adsTaskReward: num(process.env.ADS_TASK_REWARD, 25),
+  adsTaskReward: num(process.env.ADS_TASK_REWARD, 125), // paid once, when the 5th ad of the Daily Task is done (the 5 ads themselves pay 0)
+  mainAdDailyLimit: num(process.env.MAIN_AD_DAILY_LIMIT, 5),
+  mainAdCooldownMinutes: num(process.env.MAIN_AD_COOLDOWN_MINUTES, 5),
   inviteTaskReward: num(process.env.INVITE_TASK_REWARD, 50),
   streakRewards: list(process.env.STREAK_REWARDS || '5,5,10,10,15,15,20').map(Number).filter((n) => n > 0),
 
