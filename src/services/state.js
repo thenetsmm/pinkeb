@@ -91,6 +91,7 @@ export async function buildState(user, today) {
     channel: config.channelUsername
       ? { username: config.channelUsername, link: `https://t.me/${config.channelUsername}`, reward: config.channelReward, claimed: !!user.channelClaimed }
       : null,
+    proofChannel: config.proofChannel ? { username: config.proofChannel, link: `https://t.me/${config.proofChannel}` } : null,
     mainAd: (() => {
       const limit = config.mainAdDailyLimit;
       const used = user.daily?.mainAds || 0;
