@@ -3,6 +3,7 @@ import { validateInitData } from '../lib/telegramAuth.js';
 import { dayKey } from '../lib/days.js';
 import { ensureUser } from '../services/users.js';
 import { User } from '../models/index.js';
+import { bumpDau } from '../services/stats.js';
 
 export class ApiError extends Error {
   constructor(status, code, message) {
@@ -33,6 +34,16 @@ export async function auth(req, res, next) {
 
   let user = await ensureUser(tgUser, startParam);
   if (user.banned) throw new ApiError(403, 'banned', 'Your account is blocked');
+  const isAdmin = config.adminIds.includes(user.telegramId);
+  if (config.maintenance && !isAdmin)
+    throw new ApiError(503, 'maintenance', '🛠️ App is being upgraded. Please wait a little while.');
+
+  // remember the network address (used by the same-IP / multi-account detector)
+  const ip = String(req.ip || '').replace('::ffff:', '');
+  if (ip && user.lastIp !== ip) {
+    User.updateOne({ _id: user._id }, { $set: { lastIp: ip } }).catch(() => {});
+    user.lastIp = ip;
+  }
 
   // Roll the "daily" counters over when a new day (in the configured timezone) starts. Atomic + idempotent.
   const today = dayKey();
@@ -42,10 +53,12 @@ export async function auth(req, res, next) {
       { $set: { daily: { date: today, adsCount: 0, checkin: false, ads5: false, spins: 0, scratches: 0, taskAds: 0, mainAds: 0 } } },
       { new: true }
     );
+    if (rolled) bumpDau(); // first visit of the day = one daily active user
     user = rolled || (await User.findById(user._id));
   }
 
   req.user = user;
+  req.isAdmin = isAdmin;
   req.today = today;
   next();
 }
