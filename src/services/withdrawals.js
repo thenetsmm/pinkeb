@@ -26,7 +26,7 @@ export async function notifyAdminsNewWithdrawal(w, user) {
  * Approves / rejects a pending withdrawal (atomic, can only be resolved once).
  * Rejecting refunds the points.
  */
-export async function resolveWithdrawal(id, action, reason = '') {
+export async function resolveWithdrawal(id, action, reason = '', { refund = true } = {}) {
   const status = action === 'approve' ? 'success' : 'rejected';
   const w = await Withdrawal.findOneAndUpdate(
     { _id: id, status: 'pending' },
@@ -35,7 +35,7 @@ export async function resolveWithdrawal(id, action, reason = '') {
   );
   if (!w) return null;
 
-  if (status === 'rejected') {
+  if (status === 'rejected' && refund) {
     await User.updateOne({ _id: w.userId }, { $inc: { balance: w.points } });
     await Transaction.create({ userId: w.userId, type: 'withdraw_refund', amount: w.points, note: 'Withdrawal rejected' });
   }
@@ -44,7 +44,9 @@ export async function resolveWithdrawal(id, action, reason = '') {
     w.telegramId,
     status === 'success'
       ? `✅ Your withdrawal of <b>${w.amountKs} Ks</b> via ${escapeHtml(w.method)} has been sent. Thank you!`
-      : `❌ Your withdrawal of <b>${w.amountKs} Ks</b> was rejected and <b>${w.points} pts</b> were returned to your balance. ${w.reason ? `\nReason: ${escapeHtml(w.reason)}\n` : ''}Contact support if you need help.`
+      : refund
+        ? `❌ Your withdrawal of <b>${w.amountKs} Ks</b> was rejected and <b>${w.points} pts</b> were returned to your balance.${w.reason ? `\nReason: ${escapeHtml(w.reason)}` : ''}\nContact support if you need help.`
+        : `❌ Your withdrawal of <b>${w.amountKs} Ks</b> was rejected.${w.reason ? `\nReason: ${escapeHtml(w.reason)}` : ''}`
   );
   return w;
 }

@@ -4,25 +4,19 @@ import { config } from '../config.js';
 import { dayKey, dayStart } from '../lib/days.js';
 import { ApiError } from '../middleware/auth.js';
 import { AdSession, Transaction, User } from '../models/index.js';
+import { logSecurity } from './stats.js';
 
 /* ------------------------------------------------------------------ *
  * Prize tables. The result is ALWAYS rolled on the server; the client
- * only plays an animation. Weights are relative (they don't need to sum to 100).
+ * only plays an animation. Weights live in config.gameOdds (editable in the admin panel; defaults in config.js).
  *
- * Expected value per play (what the player gets back on average):
- *   Lucky spin   ~9.1 pts   (a free spin costs us nothing but gives an ad view; a paid one costs 15)
- *   Scratch card ~10 pts
- *   Mystery box  ~13.5 pts  (costs 15, so it is a small point sink)
  * ------------------------------------------------------------------ */
 // Order = clockwise position on the wheel image, starting at the top (every 60 degrees)
 export const WHEEL = [5, 10, 15, 25, 100, 0];
-const WHEEL_WEIGHTS = [35, 30, 14, 5, 1, 15];
 
 export const SCRATCH = [5, 10, 15, 20];
-const SCRATCH_WEIGHTS = [40, 30, 20, 10];
 
 export const MYSTERY = [5, 10, 50];
-const MYSTERY_WEIGHTS = [50, 35, 15];
 
 function pickIndex(weights) {
   const total = weights.reduce((a, b) => a + b, 0);
@@ -38,7 +32,7 @@ export const GAMES = {
   spin: {
     label: 'Lucky Spin',
     values: WHEEL,
-    roll: () => pickIndex(WHEEL_WEIGHTS),
+    roll: () => pickIndex(config.gameOdds.spin),
     limit: () => config.spinDailyLimit,
     usedKey: 'spins',
     nextKey: 'spinNextAt',
@@ -47,7 +41,7 @@ export const GAMES = {
   scratch: {
     label: 'Scratch Card',
     values: SCRATCH,
-    roll: () => pickIndex(SCRATCH_WEIGHTS),
+    roll: () => pickIndex(config.gameOdds.scratch),
     limit: () => config.scratchDailyLimit,
     usedKey: 'scratches',
     nextKey: 'scratchNextAt',
@@ -55,7 +49,7 @@ export const GAMES = {
   },
 };
 
-export const rollMystery = () => MYSTERY[pickIndex(MYSTERY_WEIGHTS)];
+export const rollMystery = () => MYSTERY[pickIndex(config.gameOdds.mystery)];
 
 /* --------------------------------- state --------------------------------- */
 const secondsUntil = (date) => (date ? Math.max(0, Math.ceil((date.getTime() - Date.now()) / 1000)) : 0);
@@ -96,7 +90,10 @@ export async function consumeGameSession(user, sessionId, game) {
     await AdSession.updateOne({ _id: s._id }, { $set: { status: 'expired' } });
     throw new ApiError(400, 'expired', 'Ad session expired');
   }
-  if (elapsed < s.minSeconds - 1) throw new ApiError(429, 'too_early', 'Please watch the whole ad first');
+  if (elapsed < s.minSeconds - 1) {
+    if (elapsed < 5) logSecurity('fast_ad', user, { seconds: Math.round(elapsed), needed: s.minSeconds, kind: `game:${game}` });
+    throw new ApiError(429, 'too_early', 'Please watch the whole ad first');
+  }
   if (s.needsConfirm && !s.providerConfirmed) throw new ApiError(409, 'awaiting_provider', 'Waiting for ad confirmation');
 
   const gate = await AdSession.findOneAndUpdate(
@@ -156,7 +153,7 @@ export function applyPaidPlay(user, cost, prize) {
 /* ------------------------------- leaderboard ------------------------------- */
 let cache = { day: null, at: 0, rows: [] };
 const CACHE_MS = 45_000;
-const EXCLUDED = ['withdraw', 'withdraw_refund'];
+const EXCLUDED = ['withdraw', 'withdraw_refund', 'admin'];
 
 async function todayRows(today) {
   if (cache.day === today && Date.now() - cache.at < CACHE_MS) return cache.rows;

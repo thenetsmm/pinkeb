@@ -1,7 +1,7 @@
 import { config } from '../config.js';
 import { dayKey, dayStart, yesterdayKey } from '../lib/days.js';
 import { referralLink } from '../lib/telegram.js';
-import { User, Offer, AdSession, Withdrawal } from '../models/index.js';
+import { User, Offer, OfferClaim, AdSession, Withdrawal } from '../models/index.js';
 import { gamesState } from './games.js';
 import { piggyState } from './piggy.js';
 
@@ -37,7 +37,7 @@ export async function referralCounts(user) {
 
 /** Full snapshot used by GET /api/me */
 export async function buildState(user, today) {
-  const [offers, offerCounts, refs, pendingWithdrawal, piggy] = await Promise.all([
+  const [offers, offerCounts, refs, pendingWithdrawal, piggy, claims] = await Promise.all([
     Offer.find({ active: true }).sort({ sort: 1, createdAt: 1 }).lean(),
     AdSession.aggregate([
       { $match: { userId: user._id, status: 'completed', day: today, offerId: { $ne: null } } },
@@ -46,7 +46,9 @@ export async function buildState(user, today) {
     referralCounts(user),
     Withdrawal.exists({ userId: user._id, status: 'pending' }),
     piggyState(user),
+    OfferClaim.find({ userId: user._id }).select('offerId').lean(),
   ]);
+  const claimed = new Set(claims.map((c) => String(c.offerId)));
 
   const doneByOffer = new Map(offerCounts.map((o) => [String(o._id), o.n]));
   const streak = streakInfo(user);
@@ -108,13 +110,18 @@ export async function buildState(user, today) {
     })(),
     offers: offers.map((o) => {
       const done = doneByOffer.get(String(o._id)) || 0;
+      const oneTime = o.type === 'channel' || o.type === 'link';
       return {
         id: String(o._id),
         title: o.title,
         reward: o.reward,
         seconds: o.seconds,
-        isLink: !!o.url,
-        remainingToday: Math.max(0, Math.min(o.dailyLimit - done, capLeft)),
+        type: o.type || 'ad',
+        icon: o.icon || 'play',
+        link: oneTime ? o.url || (o.channel ? `https://t.me/${o.channel.replace('@', '')}` : '') : '',
+        isLink: !!o.url && !oneTime,
+        claimed: oneTime ? claimed.has(String(o._id)) : false,
+        remainingToday: oneTime ? (claimed.has(String(o._id)) ? 0 : 1) : Math.max(0, Math.min(o.dailyLimit - done, capLeft)),
       };
     }),
     referral: {
@@ -132,6 +139,7 @@ export async function buildState(user, today) {
       ptsPerKs: config.ptsPerKs,
       methods: config.withdrawMethods,
       hasPending: !!pendingWithdrawal,
+      paused: !!config.pauseWithdrawals,
     },
     config: {
       adsgramBlockId: config.adsgramBlockId,
@@ -139,6 +147,8 @@ export async function buildState(user, today) {
       supportUsername: config.supportUsername,
       botUsername: config.botUsername,
       appName: config.appName,
+      partnerLinks: config.redirectOnLimit ? config.partnerLinks.filter(Boolean) : [],
     },
+    isAdmin: config.adminIds.includes(user.telegramId),
   };
 }
