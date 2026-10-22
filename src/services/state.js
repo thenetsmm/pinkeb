@@ -1,5 +1,5 @@
 import { config } from '../config.js';
-import { dayKey, yesterdayKey } from '../lib/days.js';
+import { dayKey, dayStart, yesterdayKey } from '../lib/days.js';
 import { referralLink } from '../lib/telegram.js';
 import { User, Offer, AdSession, Withdrawal } from '../models/index.js';
 import { gamesState } from './games.js';
@@ -89,7 +89,23 @@ export async function buildState(user, today) {
     channel: config.channelUsername
       ? { username: config.channelUsername, link: `https://t.me/${config.channelUsername}`, reward: config.channelReward, claimed: !!user.channelClaimed }
       : null,
-    mainAd: { reward: config.mainAdReward, seconds: config.mainAdSeconds, remainingToday: capLeft },
+    mainAd: (() => {
+      const limit = config.mainAdDailyLimit;
+      const used = user.daily?.mainAds || 0;
+      const left = Math.max(0, Math.min(limit - used, capLeft));
+      const cd = user.mainAdNextAt ? Math.max(0, Math.ceil((user.mainAdNextAt.getTime() - Date.now()) / 1000)) : 0;
+      const resetSec = Math.max(0, Math.ceil((dayStart().getTime() + 86400_000 - Date.now()) / 1000));
+      return {
+        reward: config.mainAdReward,
+        seconds: config.mainAdSeconds,
+        limit,
+        used,
+        remainingToday: left,
+        cooldownSec: left > 0 ? cd : 0,
+        resetSec,
+        cooldownMinutes: config.mainAdCooldownMinutes,
+      };
+    })(),
     offers: offers.map((o) => {
       const done = doneByOffer.get(String(o._id)) || 0;
       return {
