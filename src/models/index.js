@@ -36,10 +36,12 @@ const userSchema = new Schema(
       spins: { type: Number, default: 0 },
       scratches: { type: Number, default: 0 },
       taskAds: { type: Number, default: 0 }, // ads watched from the Daily Task card only
+      mainAds: { type: Number, default: 0 }, // ads watched from the main Watch Ads card
     },
 
     piggy: { startedAt: { type: Date, default: null } },
     channelClaimed: { type: Boolean, default: false },
+    mainAdNextAt: { type: Date, default: null },
 
     // game cooldowns (server time)
     games: {
