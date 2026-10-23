@@ -70,14 +70,15 @@ async function onMessage(msg) {
     if (cmd === '/promo') {
       const code = String(a[0] || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '');
       const reward = Number(a[1]);
-      if (!code || !(reward > 0)) return sendMessage(msg.chat.id, 'Usage: /promo CODE REWARD [MAX_USES] [HOURS]');
+      if (!code || !(reward > 0)) return sendMessage(msg.chat.id, 'Usage: /promo CODE REWARD [MAX_USES] [HOURS] [ad]');
       const hours = Number(a[3]);
+      const requireAd = a.slice(4).some((x) => x.toLowerCase() === 'ad'); // add the word "ad" at the end to make users watch an ad first
       const p = await PromoCode.findOneAndUpdate(
         { code },
-        { $set: { reward, maxUses: Number(a[2]) || 0, expiresAt: hours > 0 ? new Date(Date.now() + hours * 3600_000) : null, active: true, uses: 0 } },
+        { $set: { reward, maxUses: Number(a[2]) || 0, expiresAt: hours > 0 ? new Date(Date.now() + hours * 3600_000) : null, active: true, uses: 0, requireAd } },
         { upsert: true, new: true }
       );
-      return sendMessage(msg.chat.id, `✅ Promo <b>${escapeHtml(p.code)}</b>: +${p.reward} pts, ${p.maxUses || '∞'} uses${hours > 0 ? `, expires in ${hours}h` : ''}`);
+      return sendMessage(msg.chat.id, `✅ Promo <b>${escapeHtml(p.code)}</b>: +${p.reward} pts, ${p.maxUses || '∞'} uses${hours > 0 ? `, expires in ${hours}h` : ''}${requireAd ? ', ad required' : ', no ad'}`);
     }
     const [id, ...why] = a;
     if (!mongoose.isValidObjectId(id)) return sendMessage(msg.chat.id, 'Usage: /reject WITHDRAWAL_ID reason');
