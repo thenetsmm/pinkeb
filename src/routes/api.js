@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { auth, ApiError } from '../middleware/auth.js';
-import { User, Offer, OfferClaim, AdSession, Transaction, Withdrawal, Proof } from '../models/index.js';
+import { User, Offer, OfferClaim, AdSession, Transaction, Withdrawal } from '../models/index.js';
 import { bumpAd, logSecurity } from '../services/stats.js';
 import { tg } from '../lib/telegram.js';
 import { buildState, streakInfo } from '../services/state.js';
@@ -313,20 +313,6 @@ router.post('/withdraw', async (req, res) => {
   if (user.adsWatched < 5) logSecurity('withdraw_risk', user, { points, ads: user.adsWatched });
   notifyAdminsNewWithdrawal(w, user).catch(() => {});
   res.json({ ok: true, balance: updated.balance, withdrawalId: String(w._id) });
-});
-
-/* ------------------------------- public payout proofs ------------------------------- */
-router.get('/proofs', async (req, res) => {
-  const [items, agg] = await Promise.all([
-    Proof.find().sort({ createdAt: -1 }).limit(30).lean(),
-    Proof.aggregate([{ $group: { _id: null, count: { $sum: 1 }, totalKs: { $sum: '$amountKs' } } }]),
-  ]);
-  res.json({
-    count: agg[0]?.count || 0,
-    totalKs: agg[0]?.totalKs || 0,
-    channel: config.proofChannel ? { username: config.proofChannel, link: `https://t.me/${config.proofChannel}` } : null,
-    items: items.map((p) => ({ id: String(p._id), name: p.name, account: p.account, method: p.method, amountKs: p.amountKs, createdAt: p.createdAt })),
-  });
 });
 
 /* ----------------------------------- history ----------------------------------- */

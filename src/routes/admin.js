@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { adminGuard } from '../middleware/adminAuth.js';
 import { ApiError } from '../middleware/auth.js';
 import {
-  User, Offer, OfferClaim, Withdrawal, PromoCode, PromoRedemption, Transaction, DailyStat, SecurityLog,
+  User, Offer, OfferClaim, Withdrawal, PromoCode, PromoRedemption, Transaction, DailyStat, SecurityLog, ApiKey,
 } from '../models/index.js';
 import { dayKey, dayStart } from '../lib/days.js';
 import { resolveWithdrawal } from '../services/withdrawals.js';
@@ -13,6 +13,7 @@ import { editableValues, saveSettings } from '../services/settings.js';
 import { sendMessage, escapeHtml } from '../lib/telegram.js';
 import { job, recipientCount, startBroadcast } from '../services/broadcast.js';
 import { logSecurity } from '../services/stats.js';
+import { encryptKey, hashKey, testKey } from '../services/ai.js';
 
 const router = Router();
 router.use(adminGuard);
@@ -440,6 +441,87 @@ router.post('/security/ban', async (req, res) => {
   const r = await User.updateMany({ telegramId: { $in: ids } }, { $set: { banned: true, banReason: 'Multi-account / same IP' } });
   logSecurity('admin', null, { action: 'quick_ban', count: ids.length, by: req.adminId });
   res.json({ ok: true, banned: r.modifiedCount });
+});
+
+/* ------------------------------- 8. AI bot manager ------------------------------- */
+const AI_SETTINGS = ['aiEnabled', 'aiLimitEnabled', 'aiDailyLimit', 'aiMaxInput', 'aiGeminiModel', 'aiGroqModel', 'aiExtra'];
+const keyOut = (k) => {
+  const parked = k.isExhausted && k.exhaustedUntil && new Date(k.exhaustedUntil) > new Date();
+  return {
+    id: String(k._id),
+    provider: k.provider,
+    masked: '••••' + (k.hint || ''),
+    isActive: k.isActive,
+    status: !k.isActive ? 'off' : parked ? 'exhausted' : 'active',
+    exhaustedUntil: parked ? k.exhaustedUntil : null,
+    usedToday: k.usageDay === dayKey() ? k.dailyUsageCount : 0,
+    lastError: k.lastError || '',
+  };
+};
+const cleanKey = (v) => {
+  const key = String(v || '').trim();
+  if (key.length < 20 || key.length > 300 || /\s/.test(key)) throw new ApiError(400, 'invalid_key', 'That does not look like an API key');
+  return key;
+};
+
+router.get('/ai', async (req, res) => {
+  const [keys, today, blocked] = await Promise.all([
+    ApiKey.find().sort({ createdAt: 1 }).lean(),
+    User.aggregate([{ $match: { aiDay: dayKey() } }, { $group: { _id: null, users: { $sum: 1 }, questions: { $sum: '$aiCount' } } }]),
+    User.countDocuments({ botBlocked: true }),
+  ]);
+  const v = editableValues();
+  res.json({
+    settings: Object.fromEntries(AI_SETTINGS.map((k) => [k, v[k]])),
+    keys: keys.map(keyOut),
+    stats: { users: today[0]?.users || 0, questions: today[0]?.questions || 0, blocked },
+    secretSet: !!config.aiSecret,
+  });
+});
+router.put('/ai/settings', async (req, res) => {
+  const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => AI_SETTINGS.includes(k)));
+  await saveSettings(patch);
+  res.json({ ok: true });
+});
+router.post('/ai/keys', async (req, res) => {
+  const provider = req.body?.provider;
+  if (!['gemini', 'groq'].includes(provider)) throw new ApiError(400, 'invalid_provider', 'Choose Gemini or Groq');
+  const key = cleanKey(req.body?.key);
+  if (await ApiKey.exists({ keyHash: hashKey(key) })) throw new ApiError(409, 'duplicate', 'This key is already saved');
+  const k = await ApiKey.create({ provider, encryptedKey: encryptKey(key), keyHash: hashKey(key), hint: key.slice(-4) });
+  await logSecurity('admin', null, { action: `ai key added (${provider})` });
+  res.json(keyOut(k));
+});
+router.patch('/ai/keys/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(404, 'not_found');
+  const set = {};
+  if (req.body?.key) {
+    const key = cleanKey(req.body.key);
+    Object.assign(set, { encryptedKey: encryptKey(key), keyHash: hashKey(key), hint: key.slice(-4), isExhausted: false, exhaustedUntil: null, lastError: '', isActive: true });
+  }
+  if (['gemini', 'groq'].includes(req.body?.provider)) set.provider = req.body.provider;
+  if (typeof req.body?.isActive === 'boolean') set.isActive = req.body.isActive;
+  if (req.body?.resetExhausted) Object.assign(set, { isExhausted: false, exhaustedUntil: null, lastError: '' });
+  const k = await ApiKey.findByIdAndUpdate(req.params.id, { $set: set }, { new: true }).catch((e) => {
+    if (e.code === 11000) throw new ApiError(409, 'duplicate', 'This key is already saved');
+    throw e;
+  });
+  if (!k) throw new ApiError(404, 'not_found');
+  res.json(keyOut(k));
+});
+router.delete('/ai/keys/:id', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) throw new ApiError(404, 'not_found');
+  await ApiKey.deleteOne({ _id: req.params.id });
+  res.json({ ok: true });
+});
+router.post('/ai/keys/:id/test', async (req, res) => {
+  const k = mongoose.isValidObjectId(req.params.id) ? await ApiKey.findById(req.params.id) : null;
+  if (!k) throw new ApiError(404, 'not_found');
+  try {
+    res.json({ ok: true, reply: await testKey(k) });
+  } catch (e) {
+    res.json({ ok: false, error: String(e.message).slice(0, 200) });
+  }
 });
 
 export default router;

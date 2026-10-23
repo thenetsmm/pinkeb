@@ -4,7 +4,8 @@ import { config } from '../config.js';
 import { tg, sendMessage, escapeHtml, webAppUrl } from '../lib/telegram.js';
 import { ensureUser, parseReferral } from '../services/users.js';
 import { resolveWithdrawal } from '../services/withdrawals.js';
-import { Withdrawal, PromoCode } from '../models/index.js';
+import { Withdrawal, PromoCode, User } from '../models/index.js';
+import { handleAiMessage } from '../services/aiChat.js';
 
 const router = Router();
 
@@ -21,6 +22,11 @@ router.post('/webhook', async (req, res) => {
     const update = req.body || {};
     if (update.message) await onMessage(update.message);
     else if (update.callback_query) await onCallback(update.callback_query);
+    else if (update.my_chat_member?.chat?.type === 'private') {
+      // the user blocked / unblocked the bot
+      const st = update.my_chat_member.new_chat_member?.status;
+      await User.updateOne({ telegramId: update.my_chat_member.from.id }, { $set: { botBlocked: st === 'kicked' } });
+    }
   } catch (err) {
     console.error('[bot] update failed:', err);
   }
@@ -68,7 +74,11 @@ async function onMessage(msg) {
 
   if (text === '/help' || text === '/support') {
     await sendMessage(msg.chat.id, `Need help? Contact @${escapeHtml(config.supportUsername)}`);
+    return;
   }
+
+  // anything else typed in the private chat goes to the AI support assistant
+  await handleAiMessage(msg);
 }
 
 async function onCallback(cb) {
@@ -104,7 +114,7 @@ export async function setupBot() {
     const r = await tg('setWebhook', {
       url: `${config.publicUrl}/api/bot/webhook`,
       secret_token: config.webhookSecret,
-      allowed_updates: ['message', 'callback_query'],
+      allowed_updates: ['message', 'callback_query', 'my_chat_member'],
       drop_pending_updates: false,
     });
     console.log('[bot] webhook:', r?.ok ? `set -> ${config.publicUrl}/api/bot/webhook` : 'FAILED');
