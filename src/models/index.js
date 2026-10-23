@@ -44,6 +44,9 @@ const userSchema = new Schema(
     mainAdNextAt: { type: Date, default: null },
     lastIp: { type: String, default: '', index: true },
     banReason: { type: String, default: '' },
+    aiDay: { type: String, default: '' }, // AI questions asked on aiDay
+    aiCount: { type: Number, default: 0 },
+    botBlocked: { type: Boolean, default: false }, // user blocked the bot (Telegram 403)
 
     // game cooldowns (server time)
     games: {
@@ -113,22 +116,6 @@ const withdrawalSchema = new Schema(
   { timestamps: true }
 );
 
-/* ----------------------------- Payout proofs (public) ----------------------------- */
-// Masked copy of every paid withdrawal. Shown inside the app + posted to the proof channel.
-const proofSchema = new Schema(
-  {
-    withdrawalId: { type: Schema.Types.ObjectId, required: true, unique: true },
-    name: { type: String, default: '' }, // masked, e.g. "M*** A**"
-    account: { type: String, default: '' }, // masked, e.g. "09*****123"
-    method: { type: String, default: '' },
-    amountKs: { type: Number, required: true },
-    channelPosted: { type: Boolean, default: false },
-  },
-  { timestamps: { createdAt: true, updatedAt: false } }
-);
-proofSchema.index({ createdAt: -1 });
-proofSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 }); // keep one year
-
 /* ---------------------------------- Offer ---------------------------------- */
 const offerSchema = new Schema(
   {
@@ -175,7 +162,6 @@ export const Transaction = mongoose.model('Transaction', transactionSchema);
 // finished (paid / rejected) withdrawals are deleted after 30 days; pending ones have no resolvedAt so they stay
 withdrawalSchema.index({ resolvedAt: 1 }, { expireAfterSeconds: 2592000 });
 export const Withdrawal = mongoose.model('Withdrawal', withdrawalSchema);
-export const Proof = mongoose.model('Proof', proofSchema);
 export const Offer = mongoose.model('Offer', offerSchema);
 // expired promo codes are removed 7 days after they expire (codes without expiresAt stay)
 promoSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 604800 });
@@ -213,3 +199,21 @@ export const DailyStat = mongoose.model('DailyStat', dailyStatSchema);
 export const SecurityLog = mongoose.model('SecurityLog', securityLogSchema);
 export const OfferClaim = mongoose.model('OfferClaim', offerClaimSchema);
 export const Setting = mongoose.model('Setting', settingSchema);
+
+/* ---------------------------------- AI keys ---------------------------------- */
+const apiKeySchema = new Schema(
+  {
+    provider: { type: String, enum: ['gemini', 'groq'], required: true },
+    encryptedKey: { type: String, required: true }, // AES-256-GCM, never sent to any client
+    keyHash: { type: String, required: true, unique: true }, // sha256, only to reject duplicates
+    hint: { type: String, default: '' }, // last 4 characters, for the admin table
+    isActive: { type: Boolean, default: true },
+    isExhausted: { type: Boolean, default: false },
+    exhaustedUntil: { type: Date, default: null }, // exhausted keys come back by themselves after this time
+    dailyUsageCount: { type: Number, default: 0 },
+    usageDay: { type: String, default: '' },
+    lastError: { type: String, default: '' },
+  },
+  { timestamps: true }
+);
+export const ApiKey = mongoose.model('ApiKey', apiKeySchema);
