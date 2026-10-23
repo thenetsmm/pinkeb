@@ -16,9 +16,7 @@ const router = Router();
 
 /* ------------------------- public: AdsGram reward callback ------------------------- */
 // Set in AdsGram "Reward URL":  https://<backend>/api/ads/adsgram-reward?secret=<ADSGRAM_REWARD_SECRET>&userid=[userId]
-router.get(['/ads/adsgram-reward', '/ads/reward'], async (req, res) => {
-  const { secret, userid } = req.query;
-  if (!config.adsgramRewardSecret || secret !== config.adsgramRewardSecret) throw new ApiError(401, 'unauthorized');
+async function confirmLatestAd(userid) {
   const user = await User.findOne({ telegramId: Number(userid) }).select('_id');
   if (user) {
     await AdSession.findOneAndUpdate(
@@ -27,6 +25,17 @@ router.get(['/ads/adsgram-reward', '/ads/reward'], async (req, res) => {
       { sort: { createdAt: -1 } }
     );
   }
+}
+router.get(['/ads/adsgram-reward', '/ads/reward'], async (req, res) => {
+  const { secret, userid } = req.query;
+  if (!config.adsgramRewardSecret || secret !== config.adsgramRewardSecret) throw new ApiError(401, 'unauthorized');
+  await confirmLatestAd(userid);
+  res.json({ ok: true });
+});
+// OnClickA calls  <handler URL>?USERID=<telegram id>  ->  set the handler URL to  https://<backend>/api/ads/onclicka/<ADSGRAM_REWARD_SECRET>
+router.get('/ads/onclicka/:secret', async (req, res) => {
+  if (!config.adsgramRewardSecret || req.params.secret !== config.adsgramRewardSecret) throw new ApiError(401, 'unauthorized');
+  await confirmLatestAd(req.query.USERID || req.query.userid || req.query.userId);
   res.json({ ok: true });
 });
 
