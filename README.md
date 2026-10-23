@@ -54,3 +54,9 @@ Render ပေါ်မှာ deploy လုပ်မယ့် Telegram Mini App b
 - `/api/admin/*` အားလုံးက Telegram identity (ADMIN_IDS) + `x-admin-pin` နှစ်ခုလုံးစစ်ပါတယ်။
 - Modules: Overview, Withdrawals (Approve / Reject & Refund / Reject & Ban), Users, Settings (MongoDB ထဲသိမ်း၊ redeploy မလို), Tasks, Promo + Broadcast, Anti-Fraud + Maintenance/Pause switches။
 - Reject & Ban က points ပြန်မထည့်ပါ။ Channel task verify အတွက် bot ကို channel admin လုပ်ထားရမယ်။
+
+## AI Support Bot
+- Bot ထဲ ပုံမှန်စာရိုက်ရင် AI က ဖြေပါတယ်။ Admin Panel > 🤖 AI မှာ Gemini/Groq key တွေ ထည့်/ပြင်/ဖျက်၊ daily limit သတ်မှတ်ပါ။
+- Key တွေကို AES-256-GCM နဲ့ encrypt လုပ်ပြီး DB ထဲသိမ်းတယ် (`AI_KEY_SECRET` ကို Render env မှာထည့်ပါ)။ Frontend ဆီ ဘယ်တော့မှ မပို့ပါ။
+- Key တစ်ခု 429/quota ပြည့်ရင် အလိုအလျောက် ပိတ်ထားပြီး နောက် key နဲ့ တစ်ခါတည်း ဆက်ဖြေပါတယ်။ ပြန်ပွင့်ချိန်ရောက်ရင် ကိုယ့်ဘာသာ ပြန်သုံးပါတယ်။
+- Spam ကာကွယ်: user တစ်ယောက် ၃ စက္ကန့်တစ်ခါ၊ စာလုံးရေကန့်သတ်၊ မေးနေဆဲဆိုရင် ထပ်မခံ၊ ၂ မိနစ်ကျော်စာဟောင်းကို မဖြေ၊ Limit/outage မှာ ၁ ခါပဲ အကြောင်းကြား၊ စာတွေ queue မလုပ်။ Bot ကို block ထားသူကို မှတ်ထားပြီး broadcast ကျော်ပါတယ်။
