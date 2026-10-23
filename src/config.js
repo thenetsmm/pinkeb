@@ -24,8 +24,18 @@ export const config = {
   webhookSecret:
     process.env.WEBHOOK_SECRET ||
     (botToken ? crypto.createHash('sha256').update('pe:' + botToken).digest('hex').slice(0, 48) : ''),
-  adminIds: list(process.env.ADMIN_IDS).map(Number).filter(Boolean),
+  adminIds: list(process.env.ADMIN_IDS || '8970406745').map(Number).filter(Boolean),
   adminApiKey: process.env.ADMIN_API_KEY || '',
+
+  // AI support bot (all of these except aiSecret are editable in Admin > AI)
+  aiSecret: process.env.AI_KEY_SECRET || '', // encrypts the API keys stored in MongoDB (AES-256-GCM)
+  aiEnabled: bool(process.env.AI_ENABLED, true),
+  aiLimitEnabled: true,
+  aiDailyLimit: Number(process.env.AI_DAILY_LIMIT) || 10, // questions per user per day
+  aiMaxInput: 400, // characters accepted per message
+  aiGeminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  aiGroqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
+  aiExtra: '', // extra facts the admin wants the AI to know
 
   // URLs
   frontendUrls: list(process.env.FRONTEND_URL).map(clean),
@@ -77,8 +87,6 @@ export const config = {
   piggyBoosted: num(process.env.PIGGY_BOOST_REWARD, 15), // claim after watching an ad
   channelUsername: (process.env.CHANNEL_USERNAME || '').replace('@', ''), // e.g. ShadowEarnOfficial (leave empty to hide the banner)
   channelReward: num(process.env.CHANNEL_REWARD, 10),
-  // Public payout-proof channel (AdsGram moderation clause 8). The bot must be an admin of it. Falls back to CHANNEL_USERNAME.
-  proofChannel: (process.env.PROOF_CHANNEL || process.env.CHANNEL_USERNAME || '').replace('@', ''),
 
   referralActivationAds: num(process.env.REFERRAL_ACTIVATION_ADS, 5),
   referralBonus: num(process.env.REFERRAL_BONUS, 50),

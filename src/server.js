@@ -66,6 +66,10 @@ async function main() {
   setupBot().catch((e) => console.warn('[bot] setup error', e.message));
 }
 
+// a stray error (blocked user, provider outage...) must never take the whole server down
+process.on('unhandledRejection', (err) => console.error('[unhandledRejection]', err));
+process.on('uncaughtException', (err) => console.error('[uncaughtException]', err));
+
 main().catch((err) => {
   console.error('Fatal:', err);
   process.exit(1);
