@@ -34,6 +34,13 @@ const SCHEMA = {
   adsterraLink: { t: 'str', max: 400 },
   partnerLinks: { t: 'links', len: 5 },
   redirectOnLimit: { t: 'bool' },
+  aiEnabled: { t: 'bool' },
+  aiLimitEnabled: { t: 'bool' },
+  aiDailyLimit: N(1, 1000),
+  aiMaxInput: N(50, 2000),
+  aiGeminiModel: { t: 'str', max: 80 },
+  aiGroqModel: { t: 'str', max: 80 },
+  aiExtra: { t: 'str', max: 2000 },
   maintenance: { t: 'bool' },
   pauseWithdrawals: { t: 'bool' },
 };

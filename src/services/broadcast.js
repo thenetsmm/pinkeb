@@ -6,7 +6,7 @@ export const job = { running: false, total: 0, sent: 0, failed: 0, startedAt: nu
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RATE = 25; // messages per second (Telegram allows ~30)
 
-export const recipientCount = () => User.countDocuments({ banned: false });
+export const recipientCount = () => User.countDocuments({ banned: false, botBlocked: { $ne: true } });
 
 /** Sends a message to every user in the background, 25 per second. */
 export async function startBroadcast({ text, imageUrl, buttonText, appUrl }) {
@@ -21,7 +21,7 @@ export async function startBroadcast({ text, imageUrl, buttonText, appUrl }) {
 
   (async () => {
     try {
-      const cursor = User.find({ banned: false }).select('telegramId').lean().cursor();
+      const cursor = User.find({ banned: false, botBlocked: { $ne: true } }).select('telegramId').lean().cursor();
       let batch = [];
       const flush = async () => {
         const part = batch;
