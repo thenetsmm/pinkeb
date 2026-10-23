@@ -30,6 +30,7 @@ const SCHEMA = {
   streakRewards: { t: 'arr', len: 7, min: 0, max: 100000 },
   gameOdds: { t: 'odds' },
   adsgramBlockId: { t: 'str', max: 80 },
+  onclickaSpotId: { t: 'str', max: 80 },
   richadsZoneId: { t: 'str', max: 80 },
   adsterraLink: { t: 'str', max: 400 },
   partnerLinks: { t: 'links', len: 5 },
