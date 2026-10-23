@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { ApiError } from './middleware/auth.js';
 import apiRoutes from './routes/api.js';
 import adminRoutes from './routes/admin.js';
+import { backfillProofs } from './services/withdrawals.js';
 import botRoutes, { setupBot } from './routes/bot.js';
 import { Offer } from './models/index.js';
 import { loadSettings } from './services/settings.js';
@@ -61,6 +62,7 @@ async function main() {
   console.log('[db] connected');
   await seedOffers();
   await loadSettings();
+  backfillProofs();
   setInterval(() => loadSettings().catch(() => {}), 60_000); // pick up changes if several instances run
   app.listen(config.port, () => console.log(`[server] listening on :${config.port}`));
   setupBot().catch((e) => console.warn('[bot] setup error', e.message));

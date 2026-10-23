@@ -85,6 +85,8 @@ export const config = {
   piggyCycleSeconds: num(process.env.PIGGY_CYCLE_SECONDS, 600), // 10 minutes
   piggyBase: num(process.env.PIGGY_BASE_REWARD, 2), // claim without an ad
   piggyBoosted: num(process.env.PIGGY_BOOST_REWARD, 15), // claim after watching an ad
+  // Public channel where every PAID withdrawal is posted automatically (masked). Needed for AdsGram 'proof of payouts'. e.g. ShadowEarnPayouts or -100123...
+  proofChannel: (process.env.PAYMENT_PROOF_CHANNEL || '').trim(),
   channelUsername: (process.env.CHANNEL_USERNAME || '').replace('@', ''), // e.g. ShadowEarnOfficial (leave empty to hide the banner)
   channelReward: num(process.env.CHANNEL_REWARD, 10),
 
