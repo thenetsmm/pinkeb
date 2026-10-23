@@ -144,6 +144,8 @@ export async function buildState(user, today) {
     config: {
       adsgramBlockId: config.adsgramBlockId,
       onclickaSpotId: config.onclickaSpotId,
+      richadsPubId: config.richadsPubId,
+      richadsAppId: config.richadsAppId,
       demoAds: config.allowDemoAds,
       supportUsername: config.supportUsername,
       botUsername: config.botUsername,

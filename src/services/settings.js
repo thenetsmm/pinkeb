@@ -31,6 +31,8 @@ const SCHEMA = {
   gameOdds: { t: 'odds' },
   adsgramBlockId: { t: 'str', max: 80 },
   onclickaSpotId: { t: 'str', max: 80 },
+  richadsPubId: { t: 'str', max: 20 },
+  richadsAppId: { t: 'str', max: 20 },
   richadsZoneId: { t: 'str', max: 80 },
   adsterraLink: { t: 'str', max: 400 },
   partnerLinks: { t: 'links', len: 5 },
