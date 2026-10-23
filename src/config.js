@@ -96,6 +96,7 @@ export const config = {
 
   // Ads provider
   adsgramBlockId: process.env.ADSGRAM_BLOCK_ID || '',
+  onclickaSpotId: process.env.ONCLICKA_SPOT_ID || '', // OnClickA Telegram video ads (backup network)
   adsgramRewardSecret: process.env.ADSGRAM_REWARD_SECRET || '',
   // When true, the server only pays after AdsGram's server-to-server reward callback arrived.
   requireProviderConfirm: bool(process.env.REQUIRE_PROVIDER_CONFIRM, false),
