@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { auth, ApiError } from '../middleware/auth.js';
-import { User, Offer, OfferClaim, AdSession, Transaction, Withdrawal } from '../models/index.js';
+import { User, Offer, OfferClaim, AdSession, Transaction, Withdrawal, PayoutProof } from '../models/index.js';
 import { bumpAd, logSecurity } from '../services/stats.js';
 import { tg } from '../lib/telegram.js';
 import { buildState, streakInfo } from '../services/state.js';
@@ -28,6 +28,21 @@ router.get(['/ads/adsgram-reward', '/ads/reward'], async (req, res) => {
     );
   }
   res.json({ ok: true });
+});
+
+// Public list of paid withdrawals (masked) - the "proof of payouts" page. No login needed so reviewers can check it.
+router.get('/proofs', async (req, res) => {
+  const [items, total, sum] = await Promise.all([
+    PayoutProof.find().sort({ paidAt: -1 }).limit(40).lean(),
+    PayoutProof.countDocuments(),
+    PayoutProof.aggregate([{ $group: { _id: null, ks: { $sum: '$amountKs' } } }]),
+  ]);
+  res.json({
+    total,
+    totalKs: sum[0]?.ks || 0,
+    channel: config.proofChannel && !/^-?\d+$/.test(config.proofChannel) ? config.proofChannel.replace('@', '') : '',
+    items: items.map((p) => ({ ref: p.ref, name: p.name, account: p.account, amountKs: p.amountKs, method: p.method, paidAt: p.paidAt })),
+  });
 });
 
 /* everything below requires a Telegram user */

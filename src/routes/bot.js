@@ -52,6 +52,19 @@ async function onMessage(msg) {
   // ---- admin shortcuts ----
   // /promo CODE REWARD [MAX_USES] [HOURS]   e.g. /promo SHADOW20 20 100 24
   // /reject WITHDRAWAL_ID reason...
+  if (config.adminIds.includes(msg.from.id) && text.startsWith('/proofsetup')) {
+    // posts + pins the intro message in the proof channel (the bot must be an admin of that channel)
+    if (!config.proofChannel) return sendMessage(msg.chat.id, 'Set PAYMENT_PROOF_CHANNEL in Render first.');
+    const chat = /^-?\d+$/.test(config.proofChannel) ? config.proofChannel : '@' + config.proofChannel.replace('@', '');
+    const r = await tg('sendMessage', {
+      chat_id: chat,
+      parse_mode: 'HTML',
+      text: `📌 <b>${escapeHtml(config.appName)} - Payment Proofs</b>\n\nEvery withdrawal we pay is posted here automatically (names and numbers are partly hidden for privacy).\nMinimum payout ${config.minWithdraw} Ks · KBZ Pay / Wave Pay.\n\n🚀 Open the app: https://t.me/${config.botUsername}`,
+    });
+    if (r?.ok) await tg('pinChatMessage', { chat_id: chat, message_id: r.result.message_id, disable_notification: true });
+    return sendMessage(msg.chat.id, r?.ok ? '✅ Intro posted and pinned.' : '❌ Could not post. Add the bot as an admin of the channel.');
+  }
+
   if (config.adminIds.includes(msg.from.id) && (text.startsWith('/promo') || text.startsWith('/reject'))) {
     const [cmd, ...a] = text.split(/\s+/);
     if (cmd === '/promo') {
