@@ -217,3 +217,18 @@ const apiKeySchema = new Schema(
   { timestamps: true }
 );
 export const ApiKey = mongoose.model('ApiKey', apiKeySchema);
+
+/* ----------------------------- public payout proofs ----------------------------- */
+// One small row per PAID withdrawal, with masked details only. Kept even after the withdrawal itself is auto-deleted.
+const proofSchema = new Schema(
+  {
+    ref: { type: String, required: true, unique: true },
+    name: String, // masked
+    account: String, // masked
+    amountKs: Number,
+    method: String,
+    paidAt: { type: Date, default: Date.now, index: true },
+  },
+  { versionKey: false }
+);
+export const PayoutProof = mongoose.model('PayoutProof', proofSchema);
